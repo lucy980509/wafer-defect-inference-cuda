@@ -325,9 +325,11 @@ wafer-defect-inference-cuda/
 ├── src/
 │   ├── main.cpp                    # Single-image FP32 CUDA executable
 │   ├── main_fp16.cpp               # Single-image FP16 CUDA executable
+│   ├── check_shape.cpp             # Input shape, data type & memory layout validation
 │   ├── batch_benchmark.cpp         # Baseline batch benchmark
 │   ├── batch_benchmark_optimized.cpp # Ort::IoBinding latency breakdown
-│   └── batch_benchmark_cached.cpp  # RAM-cached isolated benchmark
+│   ├── batch_benchmark_cached.cpp  # RAM-cached isolated benchmark
+│   └── batch_benchmark_precision_compare.cpp # Final FP32 vs. FP16 comparison
 │
 ├── test_images/                    # Evaluation image dataset (3,828 samples)
 ├── results/                        # Benchmark execution logs
@@ -341,10 +343,11 @@ wafer-defect-inference-cuda/
 |---|---|
 | `main.cpp` | Standalone FP32 CUDA inference runner |
 | `main_fp16.cpp` | Standalone FP16 CUDA inference runner |
+| `check_shape.cpp` | Input tensor shape, data type, and memory layout validation utility |
 | `batch_benchmark.cpp` | Baseline batch benchmark |
 | `batch_benchmark_optimized.cpp` | Latency breakdown profiler with `Ort::IoBinding` |
 | `batch_benchmark_cached.cpp` | RAM-cached benchmark for pure GPU throughput isolation |
-
+| `batch_benchmark_precision_compare.cpp` | Final FP32 vs. FP16 precision and performance comparison |
 ---
 
 ## Profiling & System Metrics
