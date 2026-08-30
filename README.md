@@ -14,7 +14,7 @@ The primary objective of P2 is not simply to maximize GPU throughput, but to ide
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
 The model classifies wafer maps into eight defect categories:
 
@@ -27,7 +27,7 @@ The model classifies wafer maps into eight defect categories:
 - Random
 - Scratch
 
-### Model
+### Model Specifications
 
 - **Dataset:** WM-811K Wafer Maps
 - **Input:** `24 × 24 × 1`
@@ -40,17 +40,17 @@ The model classifies wafer maps into eight defect categories:
 
 ---
 
-# 🚀 Project Evolution
+# Project Evolution
 
 ## P0 — PyTorch Model Development
 
-The project began with development and evaluation of a lightweight CNN for wafer defect classification.
+The project began with the development and evaluation of a lightweight CNN for wafer defect classification.
 
-### Components
+### Key Components
 
-- WM-811K wafer map dataset
-- Lightweight CNN
-- Class-weighted Cross-Entropy Loss
+- WM-811K wafer map dataset processing
+- Lightweight CNN design
+- Class-weighted Cross-Entropy Loss to handle severe class imbalance
 - Data augmentation
 - 8-class classification
 - FP32 ONNX export
@@ -62,11 +62,15 @@ The project began with development and evaluation of a lightweight CNN for wafer
 models/
 ├── wafer_fault_cnn.onnx
 └── wafer_fault_cnn_fp16.onnx
-P1 — Standalone C++ Inference Engine
+```
 
-The trained model was deployed outside the Python training environment using C++.
+# P1 — Standalone C++ Inference Engine
 
-Inference Pipeline
+The trained model was deployed outside the Python training environment using C++ to eliminate runtime dependencies.
+
+## Inference Pipeline
+
+```text
 Input Image
     ↓
 OpenCV Preprocessing
@@ -75,342 +79,88 @@ Tensor Construction
     ↓
 ONNX Runtime C++ API
     ↓
-Inference
+Inference Execution
     ↓
-Classification
-Goals
-Remove Python runtime dependency
-Build a standalone C++ inference executable
-Validate ONNX Runtime C++ API integration
-Establish a deployable inference pipeline
-P2 — GPU Acceleration & Performance Engineering
+Class Output
+Key GoalsRemove Python runtime dependencyBuild a standalone C++ inference executableValidate ONNX Runtime C++ API integrationEstablish a production-ready deployable inference pipelineP2 — GPU Acceleration & Performance EngineeringP2 focuses on profiling and optimizing the inference system. The optimization process follows a measurement-driven workflow:PlaintextBaseline → Profile → Identify Bottleneck → Form Hypothesis → Controlled Experiment → Optimize → Re-measure → Engineering Decision
+P2.1 — CUDA Execution Provider IntegrationONNX Runtime CUDA Execution Provider was integrated into the C++ inference engine. CUDA execution was verified through runtime execution logs and NVIDIA Nsight Systems profiling.P2.2 — Batch Benchmark BaselineThe baseline benchmark measured inference performance across multiple batch sizes (1 / 8 / 16 / 32 / 64). Both FP32 and FP16 models were evaluated.The initial benchmark showed that simply switching to FP16 did not guarantee higher throughput, motivating deeper profiling.P2.3 — GPU I/O BindingOrt::IoBinding was introduced to eliminate host/device memory reallocation overhead. The optimized benchmark measured:CPU preprocessing latencyHost-to-Device (H2D) transfer latencyPure GPU inference latencyTotal End-to-End (E2E) latencyBatch throughputThis experiment proved that GPU memory transfer was not the primary system bottleneck.P2.4 — Bottleneck IdentificationDetailed latency breakdown revealed that the original end-to-end pipeline was heavily dominated by CPU-side image loading and decoding.Representative Batch 64 MeasurementStageLatencyShareCPU Preprocessing (Disk Read + OpenCV Decode)10.717 ms~95.4%H2D Transfer~0.037 ms~0.3%GPU Inference0.482 ms~4.3%Total E2E11.236 ms100.0%The GPU completed inference substantially faster than the CPU input pipeline could feed tensors, indicating that further GPU-side optimization alone would yield negligible end-to-end impact.P2.5 — RAM-Cached Bottleneck IsolationTo determine whether the preprocessing bottleneck originated from tensor array operations or disk I/O, a controlled RAM-cached experiment was performed. All 3,828 test images were loaded into system memory before benchmarking.Plaintext[Original Pipeline]   Disk → Image Decode → CPU Preprocessing → H2D → GPU Inference
+[RAM-Cached Pipeline] RAM Cache -----------> CPU Preprocessing → H2D → GPU Inference
+Batch 64 ComparisonMetricOriginal PipelineRAM-Cached PipelineImprovementPreprocessing Latency10.717 ms0.028 ms~382× fasterGPU Inference Latency0.482 ms0.321 ms~1.5× fasterTotal E2E Latency11.236 ms0.359 ms~31× fasterRAM caching reduced the measured preprocessing stage by over two orders of magnitude, experimentally demonstrating that disk image loading and decoding dominated the original pipeline.Note: The RAM-cached benchmark intentionally isolates inference performance from disk I/O. Its throughput represents isolated hardware inference capacity rather than end-to-end file-reading throughput.P2.6 — GPU-Focused FP32 vs. FP16 EvaluationWith disk I/O isolated, FP32 and FP16 precision modes were evaluated under identical RAM-cached conditions.Final Benchmark MatrixBatch SizeFP32 Pure InferFP16 Pure InferFP32 ThroughputFP16 ThroughputFP16 / FP32 Speedup10.139 ms0.180 ms6,944 FPS5,390 FPS0.77×80.165 ms0.225 ms44,413 FPS33,539 FPS0.76×160.215 ms0.273 ms67,744 FPS54,699 FPS0.81×320.259 ms0.384 ms112,033 FPS77,823 FPS0.69×640.349 ms0.543 ms161,305 FPS107,882 FPS0.67×Under controlled execution, FP16 was consistently 0.67× ~ 0.81× slower than FP32.🔍 Deep Dive: FP16 Performance Inversion AnalysisThe FP16 throughput drop was initially counterintuitive since the target GPU supports Tensor Core execution.NVIDIA Nsight Systems profiling confirmed active Tensor Core FP16 kernels during execution:Plaintextsm75_xmma_fprop_implicit_gemm
+This verified that the performance drop was not caused by failure to execute Tensor Core-capable kernels. Instead, the behavior aligns with specific workload characteristics:Small Spatial Dimension (24 × 24 × 1): The compute volume per layer is too small to saturate Tensor Core matrix math units.Type Conversion Overhead: ONNX Runtime CUDA EP introduces internal FP32 ↔ FP16 precision casting and kernel dispatch overheads.Launch Latency Dominance: For lightweight networks, kernel launch overhead constitutes a significant portion of total execution time, outweighing mathematical compute speedups.Engineering TakeawayTensor Core capability does not guarantee end-to-end speedups for all workloads. For lightweight CNNs with low memory bandwidth requirements, FP32 remains the optimal configuration.📊 Numerical Precision & AccuracyFP16 output logits were evaluated against the FP32 reference to verify numerical stability.Max Absolute Logit Error (Batch 64): 1.172e-02Mean Absolute Logit Error: ~1.89e-03Model Performance MetricsMetricFP32 ModelFP16 ModelAbsolute DeltaAccuracy85.08%85.06%-0.02%Weighted F1-Score0.85440.8542-0.0002The FP16 quantized model maintained virtually identical classification quality while providing no throughput benefit for this specific network size.📈 Key FindingsInitial Bottleneck Was Input I/O, Not GPU Compute: Disk loading and decoding accounted for ~95.4% of total E2E latency at Batch 64.Experimental Isolation Confirmed I/O Impact: RAM caching reduced E2E latency from 11.236 ms to 0.359 ms.H2D Transfers Were Negligible: Host-to-Device transfer accounted for < 0.5% of E2E latency, making further memory transfer tuning low priority.FP16 Inversion Verified via Profiling: Profiling confirmed active Tensor Core kernels, proving that overhead (dispatch/casting/small matrix dimensions) caused the FP16 performance degradation.Data-Driven Configuration Selection: FP32 was selected as the optimal production engine configuration based on empirical measurements.
 
-P2 focuses on profiling and optimizing the inference system.
+# Performance Engineering Summary
+PlaintextInitial E2E Pipeline (~5K FPS)
+       │
+       ▼ (Identify I/O Bottleneck)
+RAM-Cached Isolation
+       │
+       ▼ (Measure GPU Execution)
+Peak Isolated Throughput (161K FPS @ Batch 64 FP32)
+       │
+       ▼ (Controlled Precision Comparison)
+FP32 Selected Over FP16 (1.49× faster at Batch 64)
 
-The optimization process follows a measurement-driven workflow:
+📁 Project StructurePlaintextwafer-defect-inference-cuda/
+│
+├── models/
+│   ├── wafer_fault_cnn.onnx        # FP32 ONNX Model
+│   └── wafer_fault_cnn_fp16.onnx   # Quantized FP16 ONNX Model
+│
+├── src/
+│   ├── main.cpp                    # Single-image FP32 CUDA executable
+│   ├── main_fp16.cpp               # Single-image FP16 CUDA executable
+│   ├── batch_benchmark.cpp         # Baseline batch benchmark
+│   ├── batch_benchmark_optimized.cpp # Ort::IoBinding latency breakdown
+│   └── batch_benchmark_cached.cpp  # RAM-cached isolated benchmark
+│
+├── test_images/                    # Evaluation image dataset (3,828 samples)
+├── results/                        # Benchmark execution logs
+├── CMakeLists.txt                  # Build configuration
+└── README.md                       # Documentation
 
+Source File RolesFilePrimary Rolemain.cppStandalone FP32 CUDA inference runnermain_fp16.cppStandalone FP16 CUDA inference runnerbatch_benchmark.cppBaseline pipeline performance evaluatorbatch_benchmark_optimized.cppLatency breakdown profiler with Ort::IoBindingbatch_benchmark_cached.cppRAM-cached benchmark for pure GPU throughput isolation🖥️ Profiling & System MetricsNVIDIA Nsight Systems was used to profile CUDA API usage and GPU timeline events:Kernel launch latency and dispatch overheadHost-to-device memory copy synchronizationFP16 Tensor Core kernel verification (sm75_xmma_fprop_implicit_gemm)Profiling traces were used to drive optimization hypotheses rather than relying on theoretical hardware performance specifications.🛠️ Build & ExecutionPrerequisitesLanguage: C++17Build System: CMake >= 3.18Compiler: MSVC (Windows) or GCC/Clang (Linux)GPU Driver & Toolkit: CUDA Toolkit 12.xLibraries: OpenCV 4.x, ONNX Runtime GPU PackageBuild InstructionsDOScmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release
+Running ExecutablesDOS# Single-Image Run
+build\Release\wafer_inference.exe
+build\Release\wafer_inference_fp16.exe
+
+# Benchmarks
+build\Release\batch_benchmark.exe
+build\Release\batch_benchmark_optimized.exe
+build\Release\batch_benchmark_cached.exe
+
+---
+
+# 🏁 Conclusion
+
+High-performance machine learning deployment is fundamentally a systems engineering problem.
+
+This project demonstrated that:
+
+- **System bottlenecks must be identified through empirical profiling rather than assumptions.**
+- **Experimental isolation**, such as RAM caching, is necessary to accurately measure individual pipeline components.
+- **Theoretical hardware capabilities**, such as Tensor Cores, do not automatically guarantee end-to-end application speedups without considering workload size and runtime overheads.
+
+The final P2 results demonstrate a complete measurement-driven optimization cycle:
+
+```text
 Baseline
    ↓
 Profile
    ↓
 Identify Bottleneck
    ↓
-Form Hypothesis
-   ↓
 Controlled Experiment
    ↓
-Optimize
+Isolate System Components
    ↓
-Re-measure
+Measure GPU Performance
    ↓
-Make Engineering Decision
-P2.1 — CUDA Execution Provider
-
-ONNX Runtime CUDA Execution Provider was integrated into the C++ inference engine.
-
-CUDA execution was verified through runtime execution and NVIDIA Nsight Systems profiling.
-
-P2.2 — Batch Benchmark Baseline
-
-The baseline benchmark measured inference performance across multiple batch sizes:
-
-1 / 8 / 16 / 32 / 64
-
-Both FP32 and FP16 models were evaluated.
-
-The initial benchmark showed that simply switching to FP16 did not guarantee higher throughput, motivating deeper profiling.
-
-P2.3 — GPU I/O Binding
-
-Ort::IoBinding was introduced to reduce unnecessary host/device memory handling overhead.
-
-The optimized benchmark measured:
-
-CPU preprocessing
-H2D transfer
-GPU inference
-End-to-end latency
-Batch throughput
-
-This experiment showed that GPU memory transfer was not the primary bottleneck.
-
-P2.4 — Bottleneck Identification
-
-Detailed latency measurements revealed that the original end-to-end pipeline was dominated by CPU-side image loading and preprocessing.
-
-Representative Batch 64 Measurement
-Stage	Latency
-CPU Preprocessing	10.717 ms
-H2D Transfer	~0.037 ms
-GPU Inference	0.482 ms
-Total E2E	11.236 ms
-
-The GPU completed inference substantially faster than the CPU input pipeline.
-
-This indicated that further GPU optimization alone would have limited impact on the original end-to-end pipeline.
-
-P2.5 — RAM-Cached Bottleneck Isolation
-
-To determine whether the preprocessing bottleneck came from actual tensor preprocessing or from disk image loading and decoding, a controlled RAM-cached experiment was performed.
-
-All 3,828 test images were loaded into RAM before benchmarking.
-
-Original Pipeline
-Disk
- ↓
-Image Decode
- ↓
-CPU Preprocessing
- ↓
-H2D
- ↓
-GPU Inference
-RAM-Cached Pipeline
-RAM Cache
- ↓
-CPU Preprocessing
- ↓
-H2D
- ↓
-GPU Inference
-Batch 64 Comparison
-Metric	Original	RAM Cached
-Preprocessing	10.717 ms	0.028 ms
-GPU Inference	0.482 ms	0.321 ms
-Total E2E	11.236 ms	0.359 ms
-
-RAM caching reduced the measured preprocessing stage by more than two orders of magnitude.
-
-This experimentally demonstrated that disk image loading and decoding dominated the original end-to-end pipeline.
-
-The RAM-cached benchmark intentionally removes disk I/O from the timed path. Its throughput therefore represents an isolated inference benchmark rather than production end-to-end throughput.
-
-P2.6 — GPU-Focused FP32 vs FP16 Evaluation
-
-After isolating disk I/O, FP32 and FP16 were compared under the same RAM-cached conditions.
-
-Final Benchmark
-Batch Size	FP32 Pure Infer	FP16 Pure Infer	FP32 FPS	FP16 FPS	FP16 / FP32
-1	0.139 ms	0.180 ms	6,944	5,390	0.77×
-8	0.165 ms	0.225 ms	44,413	33,539	0.76×
-16	0.215 ms	0.273 ms	67,744	54,699	0.81×
-32	0.259 ms	0.384 ms	112,033	77,823	0.69×
-64	0.349 ms	0.543 ms	161,305	107,882	0.67×
-
-Under the controlled RAM-cached workload, FP16 was consistently slower than FP32.
-
-🔍 FP16 Performance Analysis
-
-The FP16 result was initially counterintuitive because the tested NVIDIA GPU is capable of Tensor Core execution.
-
-NVIDIA Nsight Systems profiling confirmed the presence of Tensor Core-capable FP16 kernel activity, including:
-
-sm75_xmma_fprop_implicit_gemm
-
-Therefore, the result was not simply caused by FP16 failing to use Tensor Core-capable kernels.
-
-Instead, the measured behavior is consistent with the characteristics of the workload:
-
-Very small input size: 24 × 24 × 1
-Lightweight CNN architecture
-Small individual layer workloads
-CUDA kernel launch / runtime dispatch overhead
-Type conversion overhead in the FP16 execution path
-Limited opportunity to amortize overhead across the small network
-
-The important engineering conclusion is:
-
-Tensor Core capability does not guarantee FP16 end-to-end acceleration for every workload.
-
-For this particular lightweight CNN, FP32 produced higher throughput across all tested batch sizes.
-
-Therefore, FP32 was selected as the preferred inference configuration for the current workload.
-
-📊 Numerical Accuracy
-
-FP16 outputs were compared against the FP32 reference.
-
-Maximum Absolute Error
-
-At Batch 64:
-
-1.172e-02
-Model-Level Comparison
-Metric	FP32	FP16
-Accuracy	85.08%	85.06%
-Weighted F1	0.8544	0.8542
-
-The FP16 model maintained similar classification quality while providing no throughput advantage in the tested workload.
-
-📈 Key Findings
-1. The Initial Bottleneck Was Not GPU Compute
-
-The original pipeline spent most of its time loading and decoding images.
-
-At Batch 64:
-
-CPU preprocessing: 10.717 ms
-GPU inference:       0.482 ms
-
-The GPU was therefore frequently waiting for the input pipeline.
-
-2. RAM Caching Experimentally Isolated the Bottleneck
-
-After removing disk I/O from the timed path:
-
-Preprocessing:
-10.717 ms → 0.028 ms
-
-E2E latency:
-11.236 ms → 0.359 ms
-
-This provided strong experimental evidence that disk I/O and image decoding dominated the original pipeline.
-
-3. H2D Transfer Was Not the Main Limitation
-
-H2D transfer represented only a small portion of the measured latency.
-
-Therefore, additional host-to-device transfer optimization was not expected to produce a large end-to-end improvement for this workload.
-
-4. FP16 Was Not Faster Despite Tensor Core-Capable Execution
-
-Nsight profiling showed Tensor Core-capable FP16 kernels, but the overall FP16 pipeline remained slower than FP32.
-
-This demonstrates that theoretical hardware capability does not automatically translate into application-level speedup.
-
-5. Optimization Must Be Workload-Specific
-
-The final configuration was selected based on measured behavior:
-
-Current workload:
-Lightweight CNN
-24 × 24 × 1 input
-
-Preferred configuration:
-FP32
-🧪 Performance Engineering Summary
-
-The major performance transition was:
-
-Initial End-to-End Pipeline
-        ↓
-Disk / Image Decode Bottleneck
-        ↓
-~5K FPS
-        ↓
-RAM-Cached Bottleneck Isolation
-        ↓
-GPU-Focused Benchmark
-        ↓
-161K FPS Isolated FP32 Throughput
-        ↓
-FP32 / FP16 Controlled Comparison
-        ↓
-FP32 Selected
-
-The key result is therefore not simply the peak FPS.
-
-The project demonstrates a complete performance-engineering cycle:
-
-Measure
+Evaluate FP32 vs. FP16
    ↓
-Profile
-   ↓
-Identify
-   ↓
-Hypothesize
-   ↓
-Isolate
-   ↓
-Optimize
-   ↓
-Validate
-   ↓
-Decide
-📁 Project Structure
-wafer-defect-inference-cuda/
-│
-├── models/
-│   ├── wafer_fault_cnn.onnx
-│   └── wafer_fault_cnn_fp16.onnx
-│
-├── src/
-│   ├── main.cpp
-│   ├── main_fp16.cpp
-│   ├── batch_benchmark.cpp
-│   ├── batch_benchmark_optimized.cpp
-│   └── batch_benchmark_cached.cpp
-│
-├── test_images/
-│   └── 3,828 wafer test images
-│
-├── results/
-│   └── benchmark outputs
-│
-├── CMakeLists.txt
-└── README.md
-Source File Roles
-File	Purpose
-main.cpp	FP32 CUDA inference executable
-main_fp16.cpp	FP16 CUDA inference executable
-batch_benchmark.cpp	Baseline batch benchmark
-batch_benchmark_optimized.cpp	I/O Binding and latency breakdown
-batch_benchmark_cached.cpp	RAM-cached controlled benchmark
-🖥️ Profiling
+Select Optimal Configuration
+```
 
-NVIDIA Nsight Systems was used to analyze:
+Rather than optimizing solely for theoretical GPU capability, the project used profiling and controlled experiments to determine which optimization strategies actually benefited the target workload.
 
-CUDA kernel execution
-CUDA API activity
-Kernel launch behavior
-GPU execution timeline
-Host/device activity
-FP16 Tensor Core-capable kernels
-
-Representative observed kernel:
-
-sm75_xmma_fprop_implicit_gemm
-
-Profiling results were used to guide subsequent experiments rather than relying solely on theoretical GPU specifications.
-
-🛠️ Build
-Requirements
-C++17
-CMake 3.18+
-MSVC compatible compiler
-CUDA Toolkit 12.x
-NVIDIA GPU
-OpenCV 4.x
-ONNX Runtime GPU package
-Configure
-cmake -B build
-Build
-cmake --build build --config Release
-▶️ Run
-FP32 Inference
-build\Release\wafer_inference.exe
-FP16 Inference
-build\Release\wafer_inference_fp16.exe
-Baseline Benchmark
-build\Release\batch_benchmark.exe
-I/O Binding Benchmark
-build\Release\batch_benchmark_optimized.exe
-RAM-Cached Benchmark
-build\Release\batch_benchmark_cached.exe
-🏁 Final Conclusion
-
-This project demonstrates that high-performance ML inference is fundamentally a systems problem.
-
-The investigation showed that:
-
-The original pipeline was dominated by disk image loading and decoding.
-Profiling identified the CPU/input pipeline as the primary bottleneck.
-RAM caching experimentally isolated and removed that bottleneck.
-GPU inference then became the dominant stage.
-FP32 and FP16 were compared under controlled GPU-focused conditions.
-FP16 remained slower despite Tensor Core-capable execution.
-FP32 was selected as the better configuration for the tested lightweight CNN.
-
-The final engineering principle demonstrated by P2 is:
-
-Do not optimize the component that looks theoretically fastest to optimize. Profile the system, identify the actual bottleneck, isolate it experimentally, and optimize based on measured evidence.
+For this lightweight wafer defect classifier, the final engineering decision was to retain FP32 inference, which achieved higher throughput than FP16 while maintaining the same classification quality.
