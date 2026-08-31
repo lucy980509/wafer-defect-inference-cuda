@@ -1,0 +1,53 @@
+# =========================
+# Build files
+# =========================
+build/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+*.cmake
+
+# =========================
+# Visual Studio
+# =========================
+.vs/
+.vscode/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.user
+*.suo
+
+# =========================
+# Compiled binaries
+# =========================
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ilk
+*.exp
+
+# =========================
+# Test dataset
+# =========================
+test_images/
+
+# =========================
+# Profiling / temporary files
+# =========================
+*.nsys-rep
+*.qdrep
+*.sqlite
+*.tmp
+*.log
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
