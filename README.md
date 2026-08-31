@@ -166,6 +166,14 @@ Detailed latency breakdown revealed that the original end-to-end pipeline was he
 
 The GPU completed inference substantially faster than the CPU input pipeline could feed tensors, indicating that further GPU-side optimization alone would yield negligible end-to-end impact.
 
+<p align="center">
+  <img src="results/bottleneck_breakdown.png" width="850">
+</p>
+
+<p align="center">
+  <em>Latency breakdown showing CPU-side image loading and preprocessing dominating end-to-end latency.</em>
+</p>
+
 ---
 
 ## P2.5 — RAM-Cached Bottleneck Isolation
@@ -201,6 +209,14 @@ H2D
 GPU Inference
 ```
 
+<p align="center">
+  <img src="results/ram_cached_benchmark.png" width="850">
+</p>
+
+<p align="center">
+  <em>RAM-cached benchmark isolating inference performance from disk I/O.</em>
+</p>
+
 ### Batch 64 Comparison
 
 | Metric | Original Pipeline | RAM-Cached Pipeline | Improvement |
@@ -230,6 +246,14 @@ With disk I/O isolated, FP32 and FP16 precision modes were evaluated under ident
 | 64 | **0.349 ms** | **0.543 ms** | **161,305 FPS** | **107,882 FPS** | **0.67×** |
 
 Under controlled execution, FP16 was consistently **0.67×–0.81×** slower than FP32.
+
+<p align="center">
+  <img src="results/fp32_vs_fp16_benchmark.png" width="850">
+</p>
+
+<p align="center">
+  <em>Controlled RAM-cached FP32 vs. FP16 benchmark across batch sizes 1–64.</em>
+</p>
 
 ---
 
@@ -319,23 +343,31 @@ FP32 Selected Over FP16 (1.49× higher throughput at Batch 64)
 wafer-defect-inference-cuda/
 │
 ├── models/
-│   ├── wafer_fault_cnn.onnx        # FP32 ONNX Model
-│   └── wafer_fault_cnn_fp16.onnx   # FP16 ONNX Model
+│   ├── wafer_fault_cnn.onnx                  # FP32 ONNX Model
+│   └── wafer_fault_cnn_fp16.onnx             # FP16 ONNX Model
 │
 ├── src/
-│   ├── main.cpp                    # Single-image FP32 CUDA executable
-│   ├── main_fp16.cpp               # Single-image FP16 CUDA executable
-│   └── check_shape.cpp             # Input shape, data type & memory layout validation
+│   ├── main.cpp                              # Single-image FP32 CUDA executable
+│   ├── main_fp16.cpp                         # Single-image FP16 CUDA executable
+│   └── check_shape.cpp                       # Input shape, data type & memory layout validation
 │
 ├── benchmarks/
-│   ├── batch_benchmark.cpp         # Baseline batch benchmark
-│   ├── batch_benchmark_optimized.cpp # Ort::IoBinding latency breakdown
-│   ├── batch_benchmark_cached.cpp  # RAM-cached isolated benchmark
+│   ├── batch_benchmark.cpp                   # Baseline batch benchmark
+│   ├── batch_benchmark_optimized.cpp         # Ort::IoBinding latency breakdown
+│   ├── batch_benchmark_cached.cpp            # RAM-cached isolated benchmark
 │   └── batch_benchmark_precision_compare.cpp # Final FP32 vs. FP16 comparison
 │
-├── results/                        # Benchmark execution logs
-├── CMakeLists.txt                  # Build configuration
-└── README.md                       # Documentation
+├── results/
+│   ├── baseline_batch_scaling.png            # Baseline batch scaling results
+│   ├── bottleneck_breakdown.png              # E2E latency bottleneck analysis
+│   ├── ram_cached_benchmark.png              # RAM-cached bottleneck isolation
+│   ├── fp32_vs_fp16_benchmark.png            # Final FP32 vs. FP16 comparison
+│   ├── fp32_model_evaluation.png             # FP32 accuracy and F1 evaluation
+│   └── fp16_model_evaluation.png             # FP16 accuracy and F1 evaluation
+│
+├── .gitignore
+├── CMakeLists.txt                            # Build configuration
+└── README.md                                 # Documentation
 ```
 
 ## 📁 Source File Roles
