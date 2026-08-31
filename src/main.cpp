@@ -94,7 +94,7 @@ int main()
         // 1. Paths & Datasets Setup
         // =========================================================
         const std::wstring modelPath = L"models/wafer_fault_cnn.onnx";
-        const std::string testImagesDir = "test_images"; // cnn_gpu/test_images µğ·ºÅÍ¸® ÁöÁ¤
+        const std::string testImagesDir = "test_images"; // cnn_gpu/test_images ÂµÃ°Â·ÂºÃ…ÃÂ¸Â® ÃÃ¶ÃÂ¤
 
         const std::vector<std::string> classNames = {
             "Center", "Donut", "Edge-Loc", "Edge-Ring",
