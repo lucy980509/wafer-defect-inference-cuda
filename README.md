@@ -325,13 +325,14 @@ wafer-defect-inference-cuda/
 ├── src/
 │   ├── main.cpp                    # Single-image FP32 CUDA executable
 │   ├── main_fp16.cpp               # Single-image FP16 CUDA executable
-│   ├── check_shape.cpp             # Input shape, data type & memory layout validation
+│   └── check_shape.cpp             # Input shape, data type & memory layout validation
+│
+├── benchmarks/
 │   ├── batch_benchmark.cpp         # Baseline batch benchmark
 │   ├── batch_benchmark_optimized.cpp # Ort::IoBinding latency breakdown
 │   ├── batch_benchmark_cached.cpp  # RAM-cached isolated benchmark
 │   └── batch_benchmark_precision_compare.cpp # Final FP32 vs. FP16 comparison
 │
-├── test_images/                    # Evaluation image dataset (3,828 samples)
 ├── results/                        # Benchmark execution logs
 ├── CMakeLists.txt                  # Build configuration
 └── README.md                       # Documentation
@@ -366,33 +367,77 @@ Profiling traces were used to drive optimization hypotheses rather than relying 
 
 ## Build & Execution
 
-### Prerequisites
+### Requirements
 
-- **Language:** C++17
-- **Build System:** CMake >= 3.18
-- **Compiler:** MSVC (Windows) or GCC/Clang (Linux)
-- **GPU Toolkit:** CUDA Toolkit 12.x
-- **Libraries:** OpenCV 4.x, ONNX Runtime GPU Package
+- C++17-compatible compiler
+- CMake >= 3.20
+- OpenCV
+- ONNX Runtime with CUDA Execution Provider
+- NVIDIA CUDA Toolkit
+- NVIDIA cuDNN
+- CUDA-capable NVIDIA GPU
 
-### Build
+### Tested Environment
 
-```cmd
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+| Component | Version / Configuration |
+|---|---|
+| OS | Windows |
+| GPU | NVIDIA GeForce GTX 1660 (6 GB VRAM) |
+| NVIDIA Driver | 561.17 |
+| CUDA Toolkit | 12.6 |
+| cuDNN | 9.8 |
+| ONNX Runtime GPU | 1.26.0 |
+| OpenCV | 4.14.0 |
+| C++ Standard | C++17 |
+| CMake | 4.4.2 |
+
+> The versions above correspond to the environment used to build and benchmark this project. Other compatible versions may also work.
+
+### Build Instructions
+
+Clone the repository:
+
+```bash
+git clone https://github.com/lucy980509/wafer-defect-inference-cuda.git
+cd wafer-defect-inference-cuda
+```
+
+Configure the project with CMake and provide the path to your ONNX Runtime installation:
+
+```bash
+cmake -S . -B build -DONNXRUNTIME_DIR="C:/path/to/onnxruntime"
+```
+
+Build the project in Release mode:
+
+```bash
 cmake --build build --config Release
 ```
 
-### Single-Image Inference
-```cmd
-build\Release\wafer_inference.exe
-build\Release\wafer_inference_fp16.exe
+The generated executables will be located in the build output directory.
+
+### Running
+
+After building the project, the executables can be run from the Release output directory.
+
+#### Single-Image Inference
+
+```bash
+build/Release/wafer_inference.exe
+build/Release/wafer_inference_fp16.exe
 ```
 
-### Benchmarks
-```cmd
-build\Release\batch_benchmark.exe
-build\Release\batch_benchmark_optimized.exe
-build\Release\batch_benchmark_cached.exe
+#### Benchmarking
+
+```bash
+build/Release/batch_benchmark.exe
+build/Release/batch_benchmark_optimized.exe
+build/Release/batch_benchmark_cached.exe
+build/Release/batch_benchmark_precision_compare.exe
 ```
+
+The benchmark executables correspond to different stages of the performance analysis, from baseline batch measurements to RAM-cached bottleneck isolation and the final FP32 vs. FP16 comparison.
+
 ---
 
 # Conclusion
