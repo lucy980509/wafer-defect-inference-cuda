@@ -209,14 +209,6 @@ H2D
 GPU Inference
 ```
 
-<p align="center">
-  <img src="results/ram_cached_benchmark.png" width="850">
-</p>
-
-<p align="center">
-  <em>RAM-cached benchmark isolating inference performance from disk I/O.</em>
-</p>
-
 ### Batch 64 Comparison
 
 | Metric | Original Pipeline | RAM-Cached Pipeline | Improvement |
@@ -228,6 +220,14 @@ GPU Inference
 RAM caching reduced the measured preprocessing stage by over two orders of magnitude, experimentally demonstrating that disk image loading and decoding dominated the original pipeline.
 
 > **Note:** The RAM-cached benchmark intentionally isolates inference performance from disk I/O. Its throughput represents isolated hardware inference capacity rather than end-to-end file-reading throughput.
+
+<p align="center">
+  <img src="results/ram_cached_benchmark.png" width="850">
+</p>
+
+<p align="center">
+  <em>RAM-cached benchmark isolating inference performance from disk I/O.</em>
+</p>
 
 ---
 
