@@ -190,7 +190,7 @@ H2D
 GPU Inference
 ```
 
-# [RAM-Cached Pipeline] 
+#### [RAM-Cached Pipeline] 
 ```text
 RAM Cache 
   ↓
@@ -292,7 +292,7 @@ FP16 output logits were evaluated against the FP32 reference to verify numerical
 
 The FP16 model maintained virtually identical classification quality while providing no throughput benefit for this specific network size.
 
-#  Key Findings
+# Key Findings
 
 - **Initial Bottleneck Was Input I/O:** Disk loading and decoding accounted for ~95.4% of total E2E latency at Batch 64.
 - **Experimental Isolation Confirmed I/O Impact:** RAM caching reduced E2E latency from 11.236 ms to 0.359 ms.
@@ -314,7 +314,7 @@ Peak Isolated Throughput (161K FPS @ Batch 64 FP32)
 FP32 Selected Over FP16 (1.49× higher throughput at Batch 64)
 ```
 
-📁 Project Structure
+# Project Structure
 ```text
 wafer-defect-inference-cuda/
 │
