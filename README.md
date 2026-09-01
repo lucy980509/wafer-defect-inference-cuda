@@ -8,6 +8,8 @@ This project covers the complete engineering path from PyTorch model development
 
 **P0 → Model Development → P1 → C++ Inference → P2 → GPU Profiling & Optimization**
 
+**[Technical Report](docs/technical_report.pdf)**
+
 The primary objective of P2 is not simply to maximize GPU throughput, but to identify the actual system bottleneck through controlled experiments and make workload-specific optimization decisions based on measured evidence.
 
 ---
@@ -364,6 +366,9 @@ wafer-defect-inference-cuda/
 │   ├── fp32_vs_fp16_benchmark.png            # Final FP32 vs. FP16 comparison
 │   ├── fp32_model_evaluation.png             # FP32 accuracy and F1 evaluation
 │   └── fp16_model_evaluation.png             # FP16 accuracy and F1 evaluation
+│
+├── docs/
+│   └── technical_report.pdf                    # Detailed technical report
 │
 ├── .gitignore
 ├── CMakeLists.txt                            # Build configuration
